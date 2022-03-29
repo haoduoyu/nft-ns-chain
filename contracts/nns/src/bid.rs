@@ -42,6 +42,8 @@ impl From<&BidInfo> for Bid {
 }
 
 impl Bid {
+
+    /// 获取物品的当前状态（是否超时）
     pub fn cur_state(&self, expire_sec: u32) -> BidState {
         match self.bid_state {
             BidState::InProgress => {
@@ -55,6 +57,7 @@ impl Bid {
         }
     }
 
+    /// 如果还在progress中返回接受，不在progress中返回拒绝；
     pub fn accept_bid(&mut self, opinion: bool, expire_sec: u32) {
         self.bid_state = self.cur_state(expire_sec);
         match self.bid_state {
@@ -71,6 +74,7 @@ impl Bid {
 }
 
 impl Contract {
+    /// 添加新的bid并获取下标
     pub(crate) fn internal_add_bid(&mut self, bid_info: &BidInfo) -> u64 {
         let bid: Bid = bid_info.into();
         let id = self.bids.len() as u64;
@@ -78,10 +82,12 @@ impl Contract {
         id
     }
 
+    /// 响应第三方合约的回调，更新指定物品信息(origin_owner)
     pub(crate) fn internal_take_offer(&mut self, owner_id: &AccountId, bid_id: u64, opinion: bool) {
         let mut bid = self.bids.get(bid_id).expect("ERR_NO_BID");
         bid.accept_bid(opinion, self.bid_expire_sec);
         bid.origin_owner = owner_id.clone();
+        // 更新一下bids中指定物品信息
         self.bids.replace(bid_id, &bid);
     }
 }

@@ -45,8 +45,10 @@ impl Contract {
 
         let caller_id = env::predecessor_account_id();
 
+        // 通过下标获取物品
         let bid = self.bids.get(bid_id).expect("ERR_NO_BID");
 
+        // 从bid中的src_nft_id拆分出contract和tokenId
         let (token_contract, token_id) = {
             let pos = bid.src_nft_id.find(":").unwrap_or(bid.src_nft_id.len());
             let (token_contract, remains) = bid.src_nft_id.split_at(pos);
@@ -62,12 +64,14 @@ impl Contract {
             .as_bytes(),
         );
 
+        // 调用第三方合约
         ext_contract::nft_token(
             token_id.to_string(),
             &token_contract.to_string(),
             0,
             GAS_FOR_VIEW,
         )
+        // 第三方地址调用后回调
         .then(ext_self::on_nft_token_callback(
             caller_id.clone(),
             bid_id,
@@ -78,6 +82,7 @@ impl Contract {
         ))
     }
 
+    /// 调用第三方合约成功后的回调
     #[private]
     pub fn on_nft_token_callback(&mut self, caller: AccountId, bid_id: u64, opinion: bool) {
         assert_eq!(
