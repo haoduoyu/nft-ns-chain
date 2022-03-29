@@ -1,0 +1,68 @@
+1、创建合约并初始化
+    合约包括数据
+        创建者
+        tokens 记录物品与人的对应关系，key是物品id（即这个物品在本合约内的第几个），value是归属人
+        metadata
+        token_num（物品数量）
+        bids（所有人创建的东西列表vector，相当于陈列吧，一排摆开）
+        bid_expire_sec（超时时间）
+        borrowers mapping类型，借出的物品列表，key为创建者的信息，value为创建的物品在bids中下标的列表
+        subjects mapping类型，key为nft唯一标识，value为物品在bids中的下标的列表
+
+2、普通用户创建要交易的物品信息（offer_bid）
+    参数：物品信息
+        src_nft_id 物品唯一标识
+        orgin_owner 拥有者
+        start_at 开始时间
+        lasts 结束时间
+        amount 价格
+        msg 算是备注信息吧
+        bid_from 物品从哪里来的
+        bid_state 物品状态，枚举类型 
+
+    获取调用创建接口的人
+    根据创建物品获取唯一标识
+    将参数代表的物品添加到合约的bids里面
+    查询调用人的所有出租的物品 borrowers.get(创建人)
+    然后将上一步查的列表加一个新的物品（value列表存的是bids列表中的位置），替换原来borrowers中调用人的物品列表
+    查询nft对应的物品 subjects.get(nft唯一id)
+    然后更新上一步的列表
+
+    返回物品的下标
+
+3、为物品出个价买它（take_offer）
+    先判断给的够不够1near
+    获取调用者的信息
+    通过参数bid_id（其实是下标吧）获取物品，没有就报个错
+    将上一步获取的物品的nft id属性，拆分，获取到合约、tokenId信息
+    调用第三方合约，并回调
+    回调判断：
+        不可访问  =>  do something
+        失败  =>  do something
+        成功  =>  {
+            解析结果，然后。。。解析的结果也没用
+            调用internal_take_offer
+            internal_take_offer干了下面的事情
+                根据bid_id查询bids，没有就报错
+                判断bid_state状态，以及是否超时了，然后根据前面判断以及opinion更新状态
+                改变一下bid的origin_owner为调用者
+                更新bids列表
+        }
+
+4、执行合约（claim_nft）
+    获取调用接口的人
+    通过参数bid_id（其实是下标吧）获取物品，没有就报个错
+    判断物品状态，不是approved就报错
+    判断物品价格和调用函数给的价格，如果物品价格贵就报个错
+    修改物品状态为借出去了，并替换bids列表
+    创建metadata数据
+    调用internal_mint
+        判断tokens的token_metadata_by_id存在且参数metadata不存在，就报错
+        判断tokens的owner_by_id.get（token id），有就报错（就是不能存在）
+        然后给tokens的owner_by_id插入值，key是tokenId，value是调用合约的人，就是执行claim_nft的人
+        tokens的token_metadata_by_id插入值，key是tokenId，value是metadata
+        如果tokens有tokens_per_owner，那么根据创建者id获取个对象，然后插入tokenId，
+        根据名称猜测，tokens_per_owner是存了指定人的tokenId的列表
+    给物品的origin owner人转bid.amount的数量的钱
+    计算剩余的钱（调用claim_nft的钱+至少1near的钱-物品的钱）退还给调用claim_nft的人
+    返回token信息
